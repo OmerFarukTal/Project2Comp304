@@ -8,6 +8,11 @@ typedef struct {
     int ID;
     int type;
     // you might want to add variables here!
+    int paintingDone;
+    int assemblyDone;
+    int packageDone;
+    int deliveryDone;
+    int QADone;    
 } Task;
 
 /* a link in the queue, holds the data and point to the next Node */
@@ -78,6 +83,7 @@ int Enqueue(Queue *pQueue, Task t) {
         pQueue->tail = item;
     }
     pQueue->size++;
+    pQueue->tail->prev = NULL; // Ben ekledim
     return TRUE;
 }
 
