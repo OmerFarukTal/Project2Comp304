@@ -125,16 +125,24 @@ int main(int argc,char **argv){
     pthread_create(&elf_b_thread, NULL, ElfB, NULL);
     pthread_create(&santa_thread, NULL, Santa, NULL);
     pthread_create(&control_thread, NULL, ControlThread, NULL);
-   
-   
+
+    pthread_sleep(simulationTime); 
+
+    pthread_cancel(elf_a_thread);
+    pthread_cancel(elf_b_thread);
+    pthread_cancel(santa_thread);
+    pthread_cancel(control_thread);
+
+    printf("HELOOO ÖMER VERYSEL. I killed it\n");
 
     
     // Wait Each thread to finish it's job
+    /*
     pthread_join(elf_a_thread, NULL);
     pthread_join(elf_b_thread, NULL);
     pthread_join(santa_thread, NULL);
     pthread_join(control_thread, NULL);
-
+    */
 
     return 0;
 }
@@ -161,7 +169,14 @@ void* ElfA(void *arg){
             pthread_mutex_unlock(&lock);
         }
         // Package Done
-       
+        
+        pthread_mutex_lock(&lock);
+        if (!isEmpty(packageQ)) {
+            pthread_mutex_unlock(&lock);
+            continue;
+        }
+        pthread_mutex_unlock(&lock);
+
 
         // Painting Task
         Task paintingT;
@@ -177,11 +192,6 @@ void* ElfA(void *arg){
             paintingT.paintingDone = 1;
             printf("Painting done id = %d\n", paintingT.ID); 
             
-            /*
-            pthread_mutex_lock(&lockPaintingID);
-            lastFinishedPaintingID = paintingT.ID;
-            pthread_mutex_unlock(&lockPaintingID);
-            */
             pthread_mutex_lock(&lockID);
             lastFinishedPaintingID = paintingT.ID;
             pthread_mutex_unlock(&lockID);
@@ -198,20 +208,6 @@ void* ElfA(void *arg){
                 pthread_mutex_unlock(&lock);
             }
             else if (paintingT.assemblyDone != 1 || paintingT.QADone != 1) {
-                /*
-                pthread_mutex_lock(&lockQAID);
-                pthread_mutex_lock(&lockQAID);
-                pthread_mutex_lock(&lockQAID);
-                if (lastFinishedAssemblyID >= lastFinishedPaintingID &&  lastFinishedQAID >= lastFinishedPaintingID) {
-                    paintingT.assemblyDone = 1; paintingT.QADone = 1;
-                    pthread_mutex_lock(&lock);
-                    Enqueue(packageQ, paintingT); 
-                    pthread_mutex_unlock(&lock);
-                }
-                pthread_mutex_unlock(&lockQAID);
-                pthread_mutex_unlock(&lockQAID);
-                pthread_mutex_unlock(&lockQAID);
-                */
                 pthread_mutex_lock(&lockID);
                 if (lastFinishedAssemblyID >= lastFinishedPaintingID &&  lastFinishedQAID >= lastFinishedPaintingID) {
                     paintingT.assemblyDone = 1; paintingT.QADone = 1;
@@ -255,7 +251,14 @@ void* ElfB(void *arg){
             pthread_mutex_unlock(&lock);
         }
         // Package Done
-       
+        
+        pthread_mutex_lock(&lock);
+        if (!isEmpty(packageQ)) {
+            pthread_mutex_unlock(&lock);
+            continue;
+        }
+        pthread_mutex_unlock(&lock);
+
 
         // Painting Task
         Task assemblyT;
@@ -271,11 +274,6 @@ void* ElfB(void *arg){
             assemblyT.assemblyDone = 1;
             printf("Assembly done id = %d\n", assemblyT.ID); 
           
-            /*
-            pthread_mutex_lock(&lockAssemblyID);
-            lastFinishedAssemblyID = assemblyT.ID;
-            pthread_mutex_unlock(&lockAssemblyID);
-            */
             pthread_mutex_lock(&lockID);
             lastFinishedAssemblyID = assemblyT.ID;
             pthread_mutex_unlock(&lockID);
@@ -293,20 +291,6 @@ void* ElfB(void *arg){
                 pthread_mutex_unlock(&lock);
             }
             else if (assemblyT.paintingDone != 1 || assemblyT.QADone != 1) {
-                /*
-                pthread_mutex_lock(&lockQAID);
-                pthread_mutex_lock(&lockQAID);
-                pthread_mutex_lock(&lockQAID);
-                if (lastFinishedPaintingID >= lastFinishedAssemblyID &&  lastFinishedQAID >= lastFinishedAssemblyID) {
-                    assemblyT.paintingDone = 1; assemblyT.QADone = 1;
-                    pthread_mutex_lock(&lock);
-                    Enqueue(packageQ, assemblyT); 
-                    pthread_mutex_unlock(&lock);
-                }
-                pthread_mutex_unlock(&lockQAID);
-                pthread_mutex_unlock(&lockQAID);
-                pthread_mutex_unlock(&lockQAID);
-                */
                 pthread_mutex_lock(&lockID);
                 if (lastFinishedPaintingID >= lastFinishedAssemblyID &&  lastFinishedQAID >= lastFinishedAssemblyID) {
                     assemblyT.paintingDone = 1; assemblyT.QADone = 1;
@@ -346,71 +330,67 @@ void* Santa(void *arg){
             printf("Delivery done id = %d\n", deliveryT.ID); 
         }
         // Delivery Done
+        
 
+        // To dequeue Delvivery till its empty
+        pthread_mutex_lock(&lock);
+        if (!isEmpty(deliveryQ) && QAQ->size < 3) {
+            pthread_mutex_unlock(&lock);
+            continue;
+        }
+        pthread_mutex_unlock(&lock);
+
+
+        //Handle QA Queue
         Task QAT;
         pthread_mutex_lock(&lock);
         if (isEmpty(QAQ)) {
             pthread_mutex_unlock(&lock);
         }
         else {
-            QAT = Dequeue(QAQ);
             pthread_mutex_unlock(&lock);
             
-            pthread_sleep(1);
-            QAT.QADone = 1;
-            printf("QA done id = %d\n", QAT.ID); 
-           
-            /*
-            pthread_mutex_lock(&lockQAID);
-            lastFinishedQAID = QAT.ID;
-            pthread_mutex_unlock(&lockQAID);
-            */
-            pthread_mutex_lock(&lockID);
-            lastFinishedQAID = QAT.ID;
-            pthread_mutex_unlock(&lockID);
+            while(QAQ->size >= 3) {
 
-
-            // What if another thread pulled the same task, and modified it?
-            // Thesoultion may be to save the id of last task they modified, elfBLastPaintingID
-            // if it exceded elfA, then it modified it, you can make the relevant Done flag 1 and insert it 
-            // if it not then do not insert it into deliveryQ, let the other one do the above
-            // make this in a way that there will be no equal case
-
-            if (QAT.paintingDone == 1 && QAT.QADone == 1 && QAT.assemblyDone == 1 ) {
                 pthread_mutex_lock(&lock);
-                Enqueue(packageQ, QAT); 
+                QAT = Dequeue(QAQ);
                 pthread_mutex_unlock(&lock);
-            }
-            else if (QAT.paintingDone != 1 || QAT.assemblyDone != 1) {
-                /*
-                pthread_mutex_lock(&lockQAID);
-                pthread_mutex_lock(&lockQAID);
-                pthread_mutex_lock(&lockQAID);
-                if (lastFinishedAssemblyID >= lastFinishedQAID &&  lastFinishedPaintingID >= lastFinishedQAID) {
-                    QAT.assemblyDone = 1; QAT.paintingDone = 1;
-                    pthread_mutex_lock(&lock);
-                    Enqueue(packageQ, QAT); 
-                    pthread_mutex_unlock(&lock);
-                }
-                pthread_mutex_unlock(&lockQAID);
-                pthread_mutex_unlock(&lockQAID);
-                pthread_mutex_unlock(&lockQAID);
-                */
+                
+                pthread_sleep(1);
+                QAT.QADone = 1;
+                printf("QA done id = %d\n", QAT.ID); 
+           
                 pthread_mutex_lock(&lockID);
-                if (lastFinishedAssemblyID >= lastFinishedQAID &&  lastFinishedPaintingID >= lastFinishedQAID) {
-                    QAT.assemblyDone = 1; QAT.paintingDone = 1;
-                    pthread_mutex_lock(&lock);
-                    Enqueue(packageQ, QAT); 
-                    pthread_mutex_unlock(&lock);
-                }
+                lastFinishedQAID = QAT.ID;
                 pthread_mutex_unlock(&lockID);
 
+
+                // What if another thread pulled the same task, and modified it?
+                // Thesoultion may be to save the id of last task they modified, elfBLastPaintingID
+                // if it exceded elfA, then it modified it, you can make the relevant Done flag 1 and insert it 
+                // if it not then do not insert it into deliveryQ, let the other one do the above
+                // make this in a way that there will be no equal case
+
+                if (QAT.paintingDone == 1 && QAT.QADone == 1 && QAT.assemblyDone == 1 ) {
+                    pthread_mutex_lock(&lock);
+                    Enqueue(packageQ, QAT); 
+                    pthread_mutex_unlock(&lock);
+                }
+                else if (QAT.paintingDone != 1 || QAT.assemblyDone != 1) {
+                    pthread_mutex_lock(&lockID);
+                    if (lastFinishedAssemblyID >= lastFinishedQAID &&  lastFinishedPaintingID >= lastFinishedQAID) {
+                        QAT.assemblyDone = 1; QAT.paintingDone = 1;
+                        pthread_mutex_lock(&lock);
+                        Enqueue(packageQ, QAT); 
+                        pthread_mutex_unlock(&lock);
+                    }
+                    pthread_mutex_unlock(&lockID);
+
+                }
+                // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
+                // The issue with QA/asembly must be resolved (Task type 4-5)
             }
-            // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
-            // The issue with QA/asembly must be resolved (Task type 4-5)
-
         }
-
 
 
     } 
