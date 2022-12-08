@@ -29,7 +29,6 @@ void printTask(Task t);
 
 pthread_mutex_t lock;
 pthread_mutex_t lockID;
-pthread_mutex_t lockPaintingID, lockAssemblyID, lockQAID;
 
 // Question is do we need seprate locks for each task Queue?
 
@@ -101,10 +100,7 @@ int main(int argc,char **argv){
     //Thread Creation for every worker and Queue Creation
     pthread_mutex_init(&lock, NULL);
     pthread_mutex_init(&lockID, NULL);
-    pthread_mutex_init(&lockPaintingID, NULL);
-    pthread_mutex_init(&lockAssemblyID, NULL);
-    pthread_mutex_init(&lockQAID, NULL);
-    
+        
     paintingQ = ConstructQueue(1000);
     assemblyQ = ConstructQueue(1000);
     QAQ = ConstructQueue(1000);
@@ -115,12 +111,9 @@ int main(int argc,char **argv){
     pthread_t elf_b_thread;
     pthread_t santa_thread;
     pthread_t control_thread;
-    /*
-    pthread_create(&elf_a_thread, NULL, ElfA, (void *) myQ);
-    pthread_create(&elf_b_thread, NULL, ElfB, (void *) myQ);
-    pthread_create(&santa_thread, NULL, Santa, (void *) myQ);
-    pthread_create(&control_thread, NULL, ControlThread, (void *) myQ);
-    */ 
+    
+    printf("TaskID  GiftID  GiftType  TaskType  RequestTime  TaskArrival  TT  Responsible\n");
+
     pthread_create(&elf_a_thread, NULL, ElfA, NULL);
     pthread_create(&elf_b_thread, NULL, ElfB, NULL);
     pthread_create(&santa_thread, NULL, Santa, NULL);
@@ -134,21 +127,13 @@ int main(int argc,char **argv){
     pthread_cancel(control_thread);
 
     printf("HELOOO ÖMER VERYSEL. I killed it\n");
-
     
-    // Wait Each thread to finish it's job
-    /*
-    pthread_join(elf_a_thread, NULL);
-    pthread_join(elf_b_thread, NULL);
-    pthread_join(santa_thread, NULL);
-    pthread_join(control_thread, NULL);
-    */
-
     return 0;
 }
 
 void* ElfA(void *arg){
     
+
     while(1) {
         
         // Cehck package Queue, priority on it, it is made first
@@ -163,7 +148,9 @@ void* ElfA(void *arg){
             
             pthread_sleep(1);
             packageT.packageDone = 1;
-            printf("elf A Packaging done id = %d\n", packageT.ID); 
+
+            printf("TaskID  %-8d%-10dC         %-13dTaskArrival  TT  A\n", packageT.ID, packageT.type, packageT.startTime); 
+            
             pthread_mutex_lock(&lock);
             Enqueue(deliveryQ, packageT); 
             pthread_mutex_unlock(&lock);
@@ -190,7 +177,8 @@ void* ElfA(void *arg){
             
             pthread_sleep(3);
             paintingT.paintingDone = 1;
-            printf("Painting done id = %d\n", paintingT.ID); 
+
+            printf("TaskID  %-8d%-10dP         %-13dTaskArrival  TT  A\n", paintingT.ID, paintingT.type, paintingT.startTime); 
             
             pthread_mutex_lock(&lockID);
             lastFinishedPaintingID = paintingT.ID;
@@ -230,7 +218,8 @@ void* ElfA(void *arg){
 }
 
 void* ElfB(void *arg){
-    
+   
+
     while(1) {
         
         // Cehck package Queue, priority on it, it is made first
@@ -245,7 +234,9 @@ void* ElfB(void *arg){
             
             pthread_sleep(1);
             packageT.packageDone = 1;
-            printf("elf B Packaging done id = %d\n", packageT.ID); 
+
+            printf("TaskID  %-8d%-10dC         %-13dTaskArrival  TT  B\n", packageT.ID, packageT.type, packageT.startTime); 
+            
             pthread_mutex_lock(&lock);
             Enqueue(deliveryQ, packageT); 
             pthread_mutex_unlock(&lock);
@@ -272,7 +263,8 @@ void* ElfB(void *arg){
             
             pthread_sleep(2);
             assemblyT.assemblyDone = 1;
-            printf("Assembly done id = %d\n", assemblyT.ID); 
+            
+            printf("TaskID  %-8d%-10dA         %-13dTaskArrival  TT  B\n", assemblyT.ID, assemblyT.type, assemblyT.startTime); 
           
             pthread_mutex_lock(&lockID);
             lastFinishedAssemblyID = assemblyT.ID;
@@ -327,7 +319,8 @@ void* Santa(void *arg){
             
             pthread_sleep(1);
             deliveryT.deliveryDone = 1;
-            printf("Delivery done id = %d\n", deliveryT.ID); 
+            
+            printf("TaskID  %-8d%-10dD         %-13dTaskArrival  TT  S\n", deliveryT.ID, deliveryT.type, deliveryT.startTime); 
         }
         // Delivery Done
         
@@ -358,7 +351,8 @@ void* Santa(void *arg){
                 
                 pthread_sleep(1);
                 QAT.QADone = 1;
-                printf("QA done id = %d\n", QAT.ID); 
+                
+                printf("TaskID  %-8d%-10dQ         %-13dTaskArrival  TT  S\n", QAT.ID, QAT.type, QAT.startTime); 
            
                 pthread_mutex_lock(&lockID);
                 lastFinishedQAID = QAT.ID;
@@ -409,7 +403,7 @@ void* ControlThread(void *arg){
 
         Task task;
         task.ID = id;
-        
+        task.startTime = id;        
 
         // Question is do we need seprate locks for each task Queue?
 

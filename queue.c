@@ -8,6 +8,7 @@ typedef struct {
     int ID;
     int type;
     // you might want to add variables here!
+    int startTime;
     int paintingDone;
     int assemblyDone;
     int packageDone;
