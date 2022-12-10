@@ -29,6 +29,8 @@ void printTask(Task t);
 
 pthread_mutex_t lock;
 pthread_mutex_t lockID;
+pthread_mutex_t lockSecond;
+pthread_mutex_t lockTaskID;
 
 // Question is do we need seprate locks for each task Queue?
 
@@ -39,7 +41,8 @@ Queue *QAQ;
 Queue *deliveryQ;
    
 int lastFinishedPaintingID, lastFinishedAssemblyID, lastFinishedQAID = 0;
-
+int second = 0;
+int taskID = 1;
 // End
 
 
@@ -100,11 +103,13 @@ int main(int argc,char **argv){
     //Thread Creation for every worker and Queue Creation
     pthread_mutex_init(&lock, NULL);
     pthread_mutex_init(&lockID, NULL);
+    pthread_mutex_init(&lockSecond, NULL);
+    pthread_mutex_init(&lockTaskID, NULL);
         
-    paintingQ = ConstructQueue(1000);
-    assemblyQ = ConstructQueue(1000);
-    QAQ = ConstructQueue(1000);
-    deliveryQ = ConstructQueue(1000);
+    paintingQ = ConstructQueue(5000);
+    assemblyQ = ConstructQueue(5000);
+    QAQ = ConstructQueue(5000);
+    deliveryQ = ConstructQueue(5000);
     packageQ = ConstructQueue(1000);
 
     pthread_t elf_a_thread;
@@ -149,7 +154,15 @@ void* ElfA(void *arg){
             pthread_sleep(1);
             packageT.packageDone = 1;
 
-            printf("TaskID  %-8d%-10dC         %-13dTaskArrival  TT  A\n", packageT.ID, packageT.type, packageT.startTime); 
+            pthread_mutex_lock(&lockSecond);
+            int curSec = second;
+            pthread_mutex_unlock(&lockSecond);
+            
+            pthread_mutex_lock(&lockTaskID);
+            printf("%-8d%-8d%-10dC         %-13d%-13d%-2d  A\n",taskID++ ,packageT.ID, packageT.type, packageT.startTime, curSec, curSec-packageT.startTime ); 
+            pthread_mutex_unlock(&lockTaskID);
+            
+            packageT.startTime = curSec;
             
             pthread_mutex_lock(&lock);
             Enqueue(deliveryQ, packageT); 
@@ -177,9 +190,17 @@ void* ElfA(void *arg){
             
             pthread_sleep(3);
             paintingT.paintingDone = 1;
-
-            printf("TaskID  %-8d%-10dP         %-13dTaskArrival  TT  A\n", paintingT.ID, paintingT.type, paintingT.startTime); 
             
+            pthread_mutex_lock(&lockSecond);
+            int curSec = second;
+            pthread_mutex_unlock(&lockSecond);
+
+            pthread_mutex_lock(&lockTaskID);
+            printf("%-8d%-8d%-10dP         %-13d%-13d%-2d  A\n", taskID++, paintingT.ID, paintingT.type, paintingT.startTime, curSec, curSec- paintingT.startTime); 
+            pthread_mutex_unlock(&lockTaskID);
+           
+            paintingT.startTime = curSec;
+
             pthread_mutex_lock(&lockID);
             lastFinishedPaintingID = paintingT.ID;
             pthread_mutex_unlock(&lockID);
@@ -235,8 +256,16 @@ void* ElfB(void *arg){
             pthread_sleep(1);
             packageT.packageDone = 1;
 
-            printf("TaskID  %-8d%-10dC         %-13dTaskArrival  TT  B\n", packageT.ID, packageT.type, packageT.startTime); 
+            pthread_mutex_lock(&lockSecond);
+            int curSec = second;
+            pthread_mutex_unlock(&lockSecond);
+
+            pthread_mutex_lock(&lockTaskID);
+            printf("%-8d%-8d%-10dC         %-13d%-13d%-2d  B\n", taskID++, packageT.ID, packageT.type, packageT.startTime, curSec, curSec-packageT.startTime ); 
+            pthread_mutex_unlock(&lockTaskID);
             
+            packageT.startTime = curSec;
+              
             pthread_mutex_lock(&lock);
             Enqueue(deliveryQ, packageT); 
             pthread_mutex_unlock(&lock);
@@ -263,12 +292,20 @@ void* ElfB(void *arg){
             
             pthread_sleep(2);
             assemblyT.assemblyDone = 1;
+
+            pthread_mutex_lock(&lockSecond);
+            int curSec = second;
+            pthread_mutex_unlock(&lockSecond);
             
-            printf("TaskID  %-8d%-10dA         %-13dTaskArrival  TT  B\n", assemblyT.ID, assemblyT.type, assemblyT.startTime); 
-          
-            pthread_mutex_lock(&lockID);
+            pthread_mutex_lock(&lockTaskID);
+            printf("%-8d%-8d%-10dA         %-13d%-13d%-2d  B\n", taskID++, assemblyT.ID, assemblyT.type, assemblyT.startTime, curSec, curSec-assemblyT.startTime); 
+            pthread_mutex_unlock(&lockTaskID);
+         
+            assemblyT.startTime = curSec;
+
+            //pthread_mutex_lock(&lockID);
             lastFinishedAssemblyID = assemblyT.ID;
-            pthread_mutex_unlock(&lockID);
+            //pthread_mutex_unlock(&lockID);
 
 
             // What if another thread pulled the same task, and modified it?
@@ -320,7 +357,13 @@ void* Santa(void *arg){
             pthread_sleep(1);
             deliveryT.deliveryDone = 1;
             
-            printf("TaskID  %-8d%-10dD         %-13dTaskArrival  TT  S\n", deliveryT.ID, deliveryT.type, deliveryT.startTime); 
+            pthread_mutex_lock(&lockSecond);
+            int curSec = second;
+            pthread_mutex_unlock(&lockSecond);
+
+            pthread_mutex_lock(&lockTaskID);
+            printf("%-8d%-8d%-10dD         %-13d%-13d%-2d  S\n", taskID++, deliveryT.ID, deliveryT.type, deliveryT.startTime, curSec, curSec-deliveryT.startTime); 
+            pthread_mutex_unlock(&lockTaskID);
         }
         // Delivery Done
         
@@ -351,9 +394,18 @@ void* Santa(void *arg){
                 
                 pthread_sleep(1);
                 QAT.QADone = 1;
-                
-                printf("TaskID  %-8d%-10dQ         %-13dTaskArrival  TT  S\n", QAT.ID, QAT.type, QAT.startTime); 
-           
+          
+
+                pthread_mutex_lock(&lockSecond);
+                int curSec = second;
+                pthread_mutex_unlock(&lockSecond);
+
+                pthread_mutex_lock(&lockTaskID);
+                printf("%-8d%-8d%-10dQ         %-13d%-13d%-2d  S\n", taskID++, QAT.ID, QAT.type, QAT.startTime, curSec, curSec-QAT.startTime); 
+                pthread_mutex_unlock(&lockTaskID);
+          
+                QAT.startTime = curSec;
+
                 pthread_mutex_lock(&lockID);
                 lastFinishedQAID = QAT.ID;
                 pthread_mutex_unlock(&lockID);
@@ -398,7 +450,11 @@ void* ControlThread(void *arg){
     while (1) {
         pthread_sleep(1); // Every second 
         int randomGift = rand()% 100; // Choose a random 0 <= randomGift <= 99
-        
+       
+        pthread_mutex_lock(&lockSecond);
+        second++;
+        pthread_mutex_unlock(&lockSecond);
+
         // Create Task
 
         Task task;
