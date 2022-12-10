@@ -141,35 +141,40 @@ void* ElfA(void *arg){
 
     while(1) {
         
-        // Cehck package Queue, priority on it, it is made first
+        // Check package Queue, priority on it, it is made first
         Task packageT;
         pthread_mutex_lock(&lock);
-        if (isEmpty(packageQ)) {
+        if (isEmpty(packageQ)) { // If it is empty release lock
             pthread_mutex_unlock(&lock);
         }
         else {
-            packageT = Dequeue(packageQ);
+            packageT = Dequeue(packageQ); // Dequeue one element
             pthread_mutex_unlock(&lock);
             
-            pthread_sleep(1);
+            pthread_sleep(1); // Package time 
             packageT.packageDone = 1;
-
+            
+            //Get the second we are in
             pthread_mutex_lock(&lockSecond);
-            int curSec = second;
+            int curSec = second; 
             pthread_mutex_unlock(&lockSecond);
             
+            // Print Log message
             pthread_mutex_lock(&lockTaskID);
             printf("%-8d%-8d%-10dC         %-13d%-13d%-2d  A\n",taskID++ ,packageT.ID, packageT.type, packageT.startTime, curSec, curSec-packageT.startTime ); 
             pthread_mutex_unlock(&lockTaskID);
-            
+           
+            // The time the task is enqueued to new task queue
             packageT.startTime = curSec;
             
+            //Enqueue the task to new queue
             pthread_mutex_lock(&lock);
             Enqueue(deliveryQ, packageT); 
             pthread_mutex_unlock(&lock);
         }
         // Package Done
         
+        // Pritority one packageing if not empty go over it
         pthread_mutex_lock(&lock);
         if (!isEmpty(packageQ)) {
             pthread_mutex_unlock(&lock);
@@ -181,24 +186,27 @@ void* ElfA(void *arg){
         // Painting Task
         Task paintingT;
         pthread_mutex_lock(&lock);
-        if (isEmpty(paintingQ)) {
+        if (isEmpty(paintingQ)) { // If empty release lock
             pthread_mutex_unlock(&lock);
         }
         else {
-            paintingT = Dequeue(paintingQ);
+            paintingT = Dequeue(paintingQ); // Dequeue one element
             pthread_mutex_unlock(&lock);
             
-            pthread_sleep(3);
+            pthread_sleep(3); // Painting time
             paintingT.paintingDone = 1;
             
+            // Get the current time
             pthread_mutex_lock(&lockSecond);
             int curSec = second;
             pthread_mutex_unlock(&lockSecond);
-
+            
+            // Print log message
             pthread_mutex_lock(&lockTaskID);
             printf("%-8d%-8d%-10dP         %-13d%-13d%-2d  A\n", taskID++, paintingT.ID, paintingT.type, paintingT.startTime, curSec, curSec- paintingT.startTime); 
             pthread_mutex_unlock(&lockTaskID);
-           
+            
+            // The time the task is enqueued to new Queue
             paintingT.startTime = curSec;
 
             pthread_mutex_lock(&lockID);
@@ -211,12 +219,12 @@ void* ElfA(void *arg){
             // if it not then do not insert it into deliveryQ, let the other one do the above
             // make this in a way that there will be no equal case
             
-            if (paintingT.paintingDone == 1 &&  paintingT.QADone == 1 &&   paintingT.assemblyDone == 1 ) {
+            if (paintingT.paintingDone == 1 &&  paintingT.QADone == 1 &&   paintingT.assemblyDone == 1 ) { // If all of them is done then enqueue
                 pthread_mutex_lock(&lock);
                 Enqueue(packageQ, paintingT); 
                 pthread_mutex_unlock(&lock);
             }
-            else if (paintingT.assemblyDone != 1 || paintingT.QADone != 1) {
+            else if (paintingT.assemblyDone != 1 || paintingT.QADone != 1) { // If not check if the others did, if not leave job to them
                 pthread_mutex_lock(&lockID);
                 if (lastFinishedAssemblyID >= lastFinishedPaintingID &&  lastFinishedQAID >= lastFinishedPaintingID) {
                     paintingT.assemblyDone = 1; paintingT.QADone = 1;
