@@ -23,7 +23,7 @@ void* ElfA(void *arg); // the one that can paint
 void* ElfB(void *arg); // the one that can assemble
 void* Santa(void *arg); 
 void* ControlThread(void *arg); // handles printing and queues (up to you)
-void printTask(Task t);
+void printTask(Task *t);
 
 // Semaphore, locks, Queues
 
@@ -144,7 +144,7 @@ void* ElfA(void *arg){
     while(1) {
         
         // Cehck package Queue, priority on it, it is made first
-        Task packageT;
+        Task *packageT;
         pthread_mutex_lock(&lock);
         if (isEmpty(packageQ)) {
             pthread_mutex_unlock(&lock);
@@ -154,8 +154,8 @@ void* ElfA(void *arg){
             pthread_mutex_unlock(&lock);
             
             pthread_sleep(1);
-            packageT.packageDone = 1;
-            printf("elf A Packaging done id = %d\n", packageT.ID); 
+            packageT->packageDone = 1;
+            printf("elf A Packaging done id = %d\n", packageT->ID); 
             pthread_mutex_lock(&lock);
             Enqueue(deliveryQ, packageT); 
             pthread_mutex_unlock(&lock);
@@ -164,7 +164,7 @@ void* ElfA(void *arg){
        
 
         // Painting Task
-        Task paintingT;
+        Task *paintingT;
         pthread_mutex_lock(&lock);
         if (isEmpty(paintingQ)) {
             pthread_mutex_unlock(&lock);
@@ -174,8 +174,8 @@ void* ElfA(void *arg){
             pthread_mutex_unlock(&lock);
             
             pthread_sleep(3);
-            paintingT.paintingDone = 1;
-            printf("Painting done id = %d\n", paintingT.ID); 
+            paintingT->paintingDone = 1;
+            printf("Painting done id = %d\n", paintingT->ID); 
             
             /*
             pthread_mutex_lock(&lockPaintingID);
@@ -183,7 +183,7 @@ void* ElfA(void *arg){
             pthread_mutex_unlock(&lockPaintingID);
             */
             pthread_mutex_lock(&lockID);
-            lastFinishedPaintingID = paintingT.ID;
+            lastFinishedPaintingID = paintingT->ID;
             pthread_mutex_unlock(&lockID);
 
             // What if another thread pulled the same task, and modified it?
@@ -192,12 +192,12 @@ void* ElfA(void *arg){
             // if it not then do not insert it into deliveryQ, let the other one do the above
             // make this in a way that there will be no equal case
             
-            if (paintingT.paintingDone == 1 &&  paintingT.QADone == 1 &&   paintingT.assemblyDone == 1 ) {
+            if (paintingT->paintingDone == 1 &&  paintingT->QADone == 1 &&   paintingT->assemblyDone == 1 ) {
                 pthread_mutex_lock(&lock);
                 Enqueue(packageQ, paintingT); 
                 pthread_mutex_unlock(&lock);
             }
-            else if (paintingT.assemblyDone != 1 || paintingT.QADone != 1) {
+            else if (paintingT->assemblyDone != 1 || paintingT->QADone != 1) {
                 /*
                 pthread_mutex_lock(&lockQAID);
                 pthread_mutex_lock(&lockQAID);
@@ -214,7 +214,7 @@ void* ElfA(void *arg){
                 */
                 pthread_mutex_lock(&lockID);
                 if (lastFinishedAssemblyID >= lastFinishedPaintingID &&  lastFinishedQAID >= lastFinishedPaintingID) {
-                    paintingT.assemblyDone = 1; paintingT.QADone = 1;
+                    paintingT->assemblyDone = 1; paintingT->QADone = 1;
                     pthread_mutex_lock(&lock);
                     Enqueue(packageQ, paintingT); 
                     pthread_mutex_unlock(&lock);
@@ -238,7 +238,7 @@ void* ElfB(void *arg){
     while(1) {
         
         // Cehck package Queue, priority on it, it is made first
-        Task packageT;
+        Task *packageT;
         pthread_mutex_lock(&lock);
         if (isEmpty(packageQ)) {
             pthread_mutex_unlock(&lock);
@@ -248,8 +248,8 @@ void* ElfB(void *arg){
             pthread_mutex_unlock(&lock);
             
             pthread_sleep(1);
-            packageT.packageDone = 1;
-            printf("elf B Packaging done id = %d\n", packageT.ID); 
+            packageT->packageDone = 1;
+            printf("elf B Packaging done id = %d\n", packageT->ID); 
             pthread_mutex_lock(&lock);
             Enqueue(deliveryQ, packageT); 
             pthread_mutex_unlock(&lock);
@@ -258,7 +258,7 @@ void* ElfB(void *arg){
        
 
         // Painting Task
-        Task assemblyT;
+        Task *assemblyT;
         pthread_mutex_lock(&lock);
         if (isEmpty(assemblyQ)) {
             pthread_mutex_unlock(&lock);
@@ -268,8 +268,8 @@ void* ElfB(void *arg){
             pthread_mutex_unlock(&lock);
             
             pthread_sleep(2);
-            assemblyT.assemblyDone = 1;
-            printf("Assembly done id = %d\n", assemblyT.ID); 
+            assemblyT->assemblyDone = 1;
+            printf("Assembly done id = %d\n", assemblyT->ID); 
           
             /*
             pthread_mutex_lock(&lockAssemblyID);
@@ -277,7 +277,7 @@ void* ElfB(void *arg){
             pthread_mutex_unlock(&lockAssemblyID);
             */
             pthread_mutex_lock(&lockID);
-            lastFinishedAssemblyID = assemblyT.ID;
+            lastFinishedAssemblyID = assemblyT->ID;
             pthread_mutex_unlock(&lockID);
 
 
@@ -287,12 +287,12 @@ void* ElfB(void *arg){
             // if it not then do not insert it into deliveryQ, let the other one do the above
             // make this in a way that there will be no equal case
 
-            if (assemblyT.paintingDone == 1 && assemblyT.QADone == 1 && assemblyT.assemblyDone == 1 ) {
+            if (assemblyT->paintingDone == 1 && assemblyT->QADone == 1 && assemblyT->assemblyDone == 1 ) {
                 pthread_mutex_lock(&lock);
                 Enqueue(packageQ, assemblyT); 
                 pthread_mutex_unlock(&lock);
             }
-            else if (assemblyT.paintingDone != 1 || assemblyT.QADone != 1) {
+            else if (assemblyT->paintingDone != 1 || assemblyT->QADone != 1) {
                 /*
                 pthread_mutex_lock(&lockQAID);
                 pthread_mutex_lock(&lockQAID);
@@ -309,7 +309,7 @@ void* ElfB(void *arg){
                 */
                 pthread_mutex_lock(&lockID);
                 if (lastFinishedPaintingID >= lastFinishedAssemblyID &&  lastFinishedQAID >= lastFinishedAssemblyID) {
-                    assemblyT.paintingDone = 1; assemblyT.QADone = 1;
+                    assemblyT->paintingDone = 1; assemblyT->QADone = 1;
                     pthread_mutex_lock(&lock);
                     Enqueue(packageQ, assemblyT); 
                     pthread_mutex_unlock(&lock);
@@ -332,7 +332,7 @@ void* Santa(void *arg){
     while(1) {
         
         // Check delivery Queue, priority on it, it is made first
-        Task deliveryT;
+        Task *deliveryT;
         pthread_mutex_lock(&lock);
         if (isEmpty(deliveryQ)) {
             pthread_mutex_unlock(&lock);
@@ -342,12 +342,13 @@ void* Santa(void *arg){
             pthread_mutex_unlock(&lock);
             
             pthread_sleep(1);
-            deliveryT.deliveryDone = 1;
-            printf("Delivery done id = %d\n", deliveryT.ID); 
-        }
+            deliveryT->deliveryDone = 1;
+            printf("Delivery done id = %d\n", deliveryT->ID); 
+            free(deliveryT);
+	}
         // Delivery Done
 
-        Task QAT;
+        Task *QAT;
         pthread_mutex_lock(&lock);
         if (isEmpty(QAQ)) {
             pthread_mutex_unlock(&lock);
@@ -357,8 +358,8 @@ void* Santa(void *arg){
             pthread_mutex_unlock(&lock);
             
             pthread_sleep(1);
-            QAT.QADone = 1;
-            printf("QA done id = %d\n", QAT.ID); 
+            QAT->QADone = 1;
+            printf("QA done id = %d\n", QAT->ID); 
            
             /*
             pthread_mutex_lock(&lockQAID);
@@ -366,7 +367,7 @@ void* Santa(void *arg){
             pthread_mutex_unlock(&lockQAID);
             */
             pthread_mutex_lock(&lockID);
-            lastFinishedQAID = QAT.ID;
+            lastFinishedQAID = QAT->ID;
             pthread_mutex_unlock(&lockID);
 
 
@@ -376,12 +377,12 @@ void* Santa(void *arg){
             // if it not then do not insert it into deliveryQ, let the other one do the above
             // make this in a way that there will be no equal case
 
-            if (QAT.paintingDone == 1 && QAT.QADone == 1 && QAT.assemblyDone == 1 ) {
+            if (QAT->paintingDone == 1 && QAT->QADone == 1 && QAT->assemblyDone == 1 ) {
                 pthread_mutex_lock(&lock);
                 Enqueue(packageQ, QAT); 
                 pthread_mutex_unlock(&lock);
             }
-            else if (QAT.paintingDone != 1 || QAT.assemblyDone != 1) {
+            else if (QAT->paintingDone != 1 || QAT->assemblyDone != 1) {
                 /*
                 pthread_mutex_lock(&lockQAID);
                 pthread_mutex_lock(&lockQAID);
@@ -398,7 +399,7 @@ void* Santa(void *arg){
                 */
                 pthread_mutex_lock(&lockID);
                 if (lastFinishedAssemblyID >= lastFinishedQAID &&  lastFinishedPaintingID >= lastFinishedQAID) {
-                    QAT.assemblyDone = 1; QAT.paintingDone = 1;
+                    QAT->assemblyDone = 1; QAT->paintingDone = 1;
                     pthread_mutex_lock(&lock);
                     Enqueue(packageQ, QAT); 
                     pthread_mutex_unlock(&lock);
@@ -427,20 +428,20 @@ void* ControlThread(void *arg){
         
         // Create Task
 
-        Task task;
-        task.ID = id;
+        Task *task= malloc(sizeof(*task));
+        task->ID = id;
         
 
         // Question is do we need seprate locks for each task Queue?
 
         if (0 <= randomGift && randomGift <= 39 ) { // only chocolate
             // only package and delivery
-            task.type = 1;
-            task.packageDone = 0;
-            task.assemblyDone = 1;
-            task.paintingDone = 1;
-            task.deliveryDone = 0;
-            task.QADone = 1;
+            task->type = 1;
+            task->packageDone = 0;
+            task->assemblyDone = 1;
+            task->paintingDone = 1;
+            task->deliveryDone = 0;
+            task->QADone = 1;
             
             pthread_mutex_lock(&lock);
             Enqueue(packageQ, task);
@@ -449,12 +450,12 @@ void* ControlThread(void *arg){
         }
         else if (40 <=randomGift && randomGift <= 59) { // wooden toy and chocolate
             // painting, package and delivery
-            task.type = 2;
-            task.packageDone = 0;
-            task.assemblyDone = 1;
-            task.paintingDone = 0;
-            task.deliveryDone = 0;
-            task.QADone = 1;
+            task->type = 2;
+            task->packageDone = 0;
+            task->assemblyDone = 1;
+            task->paintingDone = 0;
+            task->deliveryDone = 0;
+            task->QADone = 1;
             
             pthread_mutex_lock(&lock);
             Enqueue(paintingQ, task);
@@ -463,12 +464,12 @@ void* ControlThread(void *arg){
         }
         else if (60 <=randomGift && randomGift <= 79) { // plastic toy and chocolate
             // assemble, package and delivery
-            task.type = 3;
-            task.packageDone = 0;
-            task.assemblyDone = 0;
-            task.paintingDone = 1;
-            task.deliveryDone = 0;
-            task.QADone = 1;
+            task->type = 3;
+            task->packageDone = 0;
+            task->assemblyDone = 0;
+            task->paintingDone = 1;
+            task->deliveryDone = 0;
+            task->QADone = 1;
             
             pthread_mutex_lock(&lock);
             Enqueue(assemblyQ, task);
@@ -477,12 +478,12 @@ void* ControlThread(void *arg){
         }
         else if (80 <=randomGift && randomGift <= 84) { // GS5, wooden toy and chocolate
             // painting, QA, package and delivery
-            task.type = 4;
-            task.packageDone = 0;
-            task.assemblyDone = 1;
-            task.paintingDone = 0;
-            task.deliveryDone = 0;
-            task.QADone = 0;
+            task->type = 4;
+            task->packageDone = 0;
+            task->assemblyDone = 1;
+            task->paintingDone = 0;
+            task->deliveryDone = 0;
+            task->QADone = 0;
         
             pthread_mutex_lock(&lock);
             Enqueue(paintingQ, task);
@@ -492,12 +493,12 @@ void* ControlThread(void *arg){
         }
         else if (85 <=randomGift  && randomGift <= 89) { // GS5, plastic toy and chocolate 
             // assemble, QA, package and delivery
-            task.type = 5;
-            task.packageDone = 0;
-            task.assemblyDone = 0;
-            task.paintingDone = 1;
-            task.deliveryDone = 0;
-            task.QADone = 0;
+            task->type = 5;
+            task->packageDone = 0;
+            task->assemblyDone = 0;
+            task->paintingDone = 1;
+            task->deliveryDone = 0;
+            task->QADone = 0;
         
             pthread_mutex_lock(&lock);
             Enqueue(assemblyQ, task);
@@ -526,29 +527,29 @@ void* ControlThread(void *arg){
 
 
 
-void printTask(Task t) {
+void printTask(Task *t) {
     printf("*****************************\n");
-    printf("Task id = %d\n", t.ID);
-    if (t.type == 1) {
+    printf("Task id = %d\n", t->ID);
+    if (t->type == 1) {
        printf("chocolate, package, delivery\n"); 
     }
-    else if (t.type == 2){
+    else if (t->type == 2){
        printf("chocolate, painting, package, delivery\n"); 
     }
-    else if (t.type == 3){
+    else if (t->type == 3){
        printf("chocolate, assembly, package, delivery\n"); 
     }
-    else if (t.type == 4){
+    else if (t->type == 4){
        printf("chocolate, painting, QA, package, delivery\n"); 
     }
     else {
        printf("chocolate, assembly, QA, package, delivery\n"); 
     }
-    printf("Assembly Done = %d\n", t.assemblyDone);
-    printf("Painting Done = %d\n", t.paintingDone);
-    printf("Package Done = %d\n", t.packageDone);
-    printf("QA Done = %d\n", t.QADone);
-    printf("Delivery Done = %d\n", t.deliveryDone);
+    printf("Assembly Done = %d\n", t->assemblyDone);
+    printf("Painting Done = %d\n", t->paintingDone);
+    printf("Package Done = %d\n", t->packageDone);
+    printf("QA Done = %d\n", t->QADone);
+    printf("Delivery Done = %d\n", t->deliveryDone);
     printf("*****************************\n");
 }
 

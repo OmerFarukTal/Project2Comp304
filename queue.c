@@ -18,7 +18,7 @@ typedef struct {
 
 /* a link in the queue, holds the data and point to the next Node */
 typedef struct Node_t {
-    Task data;
+    Task *data;
     struct Node_t *prev;
 } NODE;
 
@@ -32,8 +32,8 @@ typedef struct Queue {
 
 Queue *ConstructQueue(int limit);
 void DestructQueue(Queue *queue);
-int Enqueue(Queue *pQueue, Task t);
-Task Dequeue(Queue *pQueue);
+int Enqueue(Queue *pQueue, Task *t);
+Task* Dequeue(Queue *pQueue);
 int isEmpty(Queue* pQueue);
 
 Queue *ConstructQueue(int limit) {
@@ -60,7 +60,7 @@ void DestructQueue(Queue *queue) {
     free(queue);
 }
 
-int Enqueue(Queue *pQueue, Task t) {
+int Enqueue(Queue *pQueue, Task *t) {
     /* Bad parameter */
     NODE* item = (NODE*) malloc(sizeof (NODE));
     item->data = t;
@@ -88,10 +88,10 @@ int Enqueue(Queue *pQueue, Task t) {
     return TRUE;
 }
 
-Task Dequeue(Queue *pQueue) {
+Task* Dequeue(Queue *pQueue) {
     /*the queue is empty or bad param*/
     NODE *item;
-    Task ret;
+    Task *ret;
     if (isEmpty(pQueue))
         return ret;
     item = pQueue->head;
@@ -112,3 +112,4 @@ int isEmpty(Queue* pQueue) {
         return FALSE;
     }
 }
+
