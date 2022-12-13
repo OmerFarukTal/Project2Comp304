@@ -32,13 +32,16 @@ Queue *assemblyQ;
 Queue *packageQ;
 Queue *QAQ;
 Queue *deliveryQ;
-   
-int lastFinishedPaintingID, lastFinishedAssemblyID, lastFinishedQAID = 0; //Shared
-int second = 0;
-int taskID = 1;
+
 
 pthread_mutex_t lock; // Locks (lock => lock for Queues, lockID lastFinished)
 pthread_mutex_t lockID;
+
+// General variables
+
+int second = 0;
+int taskID = 1;
+
 pthread_mutex_t lockSecond;
 pthread_mutex_t lockTaskID;
 
@@ -52,11 +55,9 @@ Queue *packageQPrior;
 Queue *QAQPrior;
 Queue *deliveryQPrior;
 
-int priorLastFinishedPaintingID, priorLastFinishedAssemblyID, priorLastFinishedQAID = 0;
 
 pthread_mutex_t priorQLock;
 pthread_mutex_t priorLockID;
-
 // End
 
 // pthread sleeper function
@@ -155,7 +156,7 @@ int main(int argc,char **argv){
     pthread_cancel(santa_thread);
     pthread_cancel(control_thread);
 
-    printf("HELOOO ÖMER VERYSEL. I killed it\n");
+    //printf("HELOOO ÖMER VERYSEL. I killed it\n");
     
     return 0;
 }
@@ -164,6 +165,113 @@ void* ElfA(void *arg){
     
 
     while(1) {
+    
+    	
+    	/*
+                        NEW ZELAND TASKS MAKE A HARD CHECK HERE
+         
+        */
+        
+        // Check package Queue, priority on it, it is made first
+        Task *packageTPrior;
+        pthread_mutex_lock(&priorQLock);
+        if (isEmpty(packageQPrior)) { // If it is empty release lock
+            pthread_mutex_unlock(&priorQLock);
+        }
+        else {
+            packageTPrior = Dequeue(packageQPrior); // Dequeue one element
+            pthread_mutex_unlock(&priorQLock);
+            
+            pthread_sleep(1); // Package time 
+            packageTPrior->packageDone = 1;
+            
+            //Get the second we are in
+            pthread_mutex_lock(&lockSecond);
+            int curSec = second; 
+            pthread_mutex_unlock(&lockSecond);
+            
+            // Print Log message
+            pthread_mutex_lock(&lockTaskID);
+            printf("%-8d%-8d%-10dCN        %-13d%-13d%-4dA\n",taskID++ ,packageTPrior->ID, packageTPrior->type, packageTPrior->startTime, curSec, curSec-packageTPrior->startTime ); 
+            pthread_mutex_unlock(&lockTaskID);
+           
+            // The time the task is enqueued to new task queue
+            packageTPrior->startTime = curSec;
+            
+            //Enqueue the task to new queue
+            pthread_mutex_lock(&priorQLock);
+            Enqueue(deliveryQPrior, packageTPrior); 
+            pthread_mutex_unlock(&priorQLock);
+        }
+        // Package Done 
+        
+        // Pritority one packageing if not empty go over it
+        pthread_mutex_lock(&priorQLock);
+        if (!isEmpty(packageQPrior)) {
+            pthread_mutex_unlock(&priorQLock);
+            continue;
+        }
+        pthread_mutex_unlock(&priorQLock);
+
+
+        // Painting Task
+        Task *paintingTPrior;
+        pthread_mutex_lock(&priorQLock);
+        if (isEmpty(paintingQPrior)) { // If empty release lock
+            pthread_mutex_unlock(&priorQLock);
+        }
+        else {
+            paintingTPrior = Dequeue(paintingQPrior); // Dequeue one element
+            pthread_mutex_unlock(&priorQLock);
+            
+            pthread_sleep(3); // Painting time
+            pthread_mutex_lock(&priorLockID);
+            paintingTPrior->paintingDone = 1;
+            pthread_mutex_unlock(&priorLockID);
+            
+            // Get the current time
+            pthread_mutex_lock(&lockSecond);
+            int curSec = second;
+            pthread_mutex_unlock(&lockSecond);
+            
+            // Print log message
+            pthread_mutex_lock(&lockTaskID);
+            printf("%-8d%-8d%-10dPN        %-13d%-13d%-4dA\n", taskID++, paintingTPrior->ID, paintingTPrior->type, paintingTPrior->startTime, curSec, curSec- paintingTPrior->startTime); 
+            pthread_mutex_unlock(&lockTaskID);
+            
+            // The time the task is enqueued to new Queue
+            paintingTPrior->startTime = curSec;
+
+            // What if another thread pulled the same task, and modified it?
+            // Thesoultion may be to save the id of last task they modified, elfBLastPaintingID
+            // if it exceded elfA, then it modified it, you can make the relevant Done flag 1 and insert it 
+            // if it not then do not insert it into deliveryQ, let the other one do the above
+            // make this in a way that there will be no equal case
+            
+            pthread_mutex_lock(&priorLockID);
+            if (paintingTPrior->paintingDone == 1 &&  paintingTPrior->QADone == 1 &&   paintingTPrior->assemblyDone == 1 ) { // If all of them is done then enqueue
+                pthread_mutex_lock(&priorQLock);
+                Enqueue(packageQPrior, paintingTPrior); 
+                pthread_mutex_unlock(&priorQLock);
+            }
+            else if (paintingTPrior->assemblyDone != 1 || paintingTPrior->QADone != 1) { // If not check if the others did, if not leave job to them
+            }
+            pthread_mutex_unlock(&priorLockID);
+            // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
+            // The issue with QA/painting must be resolved (Task type 4-5)
+            
+        }
+        
+        pthread_mutex_lock(&priorQLock);
+        if (!isEmpty(packageQPrior) || !isEmpty(paintingQPrior) ) {
+            pthread_mutex_unlock(&priorQLock); 
+            continue;
+        }
+        pthread_mutex_unlock(&priorQLock);
+
+    	/*
+    								NORMAL TASKS
+    	*/
         
         // Check package Queue, priority on it, it is made first
         Task *packageT;
@@ -218,7 +326,9 @@ void* ElfA(void *arg){
             pthread_mutex_unlock(&lock);
             
             pthread_sleep(3); // Painting time
+            pthread_mutex_lock(&lockID);
             paintingT->paintingDone = 1;
+            pthread_mutex_unlock(&lockID);
             
             // Get the current time
             pthread_mutex_lock(&lockSecond);
@@ -233,142 +343,27 @@ void* ElfA(void *arg){
             // The time the task is enqueued to new Queue
             paintingT->startTime = curSec;
 
-            pthread_mutex_lock(&lockID);
-            lastFinishedPaintingID = paintingT->ID;
-            pthread_mutex_unlock(&lockID);
-
             // What if another thread pulled the same task, and modified it?
             // Thesoultion may be to save the id of last task they modified, elfBLastPaintingID
             // if it exceded elfA, then it modified it, you can make the relevant Done flag 1 and insert it 
             // if it not then do not insert it into deliveryQ, let the other one do the above
             // make this in a way that there will be no equal case
-            
+           
+            pthread_mutex_lock(&lockID);
             if (paintingT->paintingDone == 1 &&  paintingT->QADone == 1 &&   paintingT->assemblyDone == 1 ) { // If all of them is done then enqueue
                 pthread_mutex_lock(&lock);
                 Enqueue(packageQ, paintingT); 
                 pthread_mutex_unlock(&lock);
             }
             else if (paintingT->assemblyDone != 1 || paintingT->QADone != 1) { // If not check if the others did, if not leave job to them
-                pthread_mutex_lock(&lockID);
-                if (lastFinishedAssemblyID >= lastFinishedPaintingID &&  lastFinishedQAID >= lastFinishedPaintingID) {
-                    paintingT->assemblyDone = 1; paintingT->QADone = 1;
-                    pthread_mutex_lock(&lock);
-                    Enqueue(packageQ, paintingT); 
-                    pthread_mutex_unlock(&lock);
-                }
-                pthread_mutex_unlock(&lockID);
-
-
             }
+            pthread_mutex_unlock(&lockID);
             // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
             // The issue with QA/painting must be resolved (Task type 4-5)
             
         }
 
-        /*
-                        NEW ZELAND TASKS MAKE A HARD CHECK HERE
-         
-        */
         
-        // Check package Queue, priority on it, it is made first
-        Task *packageTPrior;
-        pthread_mutex_lock(&priorQLock);
-        if (isEmpty(packageQPrior)) { // If it is empty release lock
-            pthread_mutex_unlock(&priorQLock);
-        }
-        else {
-            packageTPrior = Dequeue(packageQPrior); // Dequeue one element
-            pthread_mutex_unlock(&priorQLock);
-            
-            pthread_sleep(1); // Package time 
-            packageTPrior->packageDone = 1;
-            
-            //Get the second we are in
-            pthread_mutex_lock(&lockSecond);
-            int curSec = second; 
-            pthread_mutex_unlock(&lockSecond);
-            
-            // Print Log message
-            pthread_mutex_lock(&lockTaskID);
-            printf("%-8d%-8d%-10dCN        %-13d%-13d%-4dA\n",taskID++ ,packageTPrior->ID, packageTPrior->type, packageTPrior->startTime, curSec, curSec-packageTPrior->startTime ); 
-            pthread_mutex_unlock(&lockTaskID);
-           
-            // The time the task is enqueued to new task queue
-            packageTPrior->startTime = curSec;
-            
-            //Enqueue the task to new queue
-            pthread_mutex_lock(&priorQLock);
-            Enqueue(deliveryQPrior, packageTPrior); 
-            pthread_mutex_unlock(&priorQLock);
-        }
-        // Package Done 
-        
-        // Pritority one packageing if not empty go over it
-        pthread_mutex_lock(&priorQLock);
-        if (!isEmpty(packageQPrior)) {
-            pthread_mutex_unlock(&priorQLock);
-            continue;
-        }
-        pthread_mutex_unlock(&priorQLock);
-
-
-        // Painting Task
-        Task *paintingTPrior;
-        pthread_mutex_lock(&priorQLock);
-        if (isEmpty(paintingQPrior)) { // If empty release lock
-            pthread_mutex_unlock(&priorQLock);
-        }
-        else {
-            paintingT = Dequeue(paintingQPrior); // Dequeue one element
-            pthread_mutex_unlock(&priorQLock);
-            
-            pthread_sleep(3); // Painting time
-            paintingTPrior->paintingDone = 1;
-            
-            // Get the current time
-            pthread_mutex_lock(&lockSecond);
-            int curSec = second;
-            pthread_mutex_unlock(&lockSecond);
-            
-            // Print log message
-            pthread_mutex_lock(&lockTaskID);
-            printf("%-8d%-8d%-10dPN        %-13d%-13d%-4dA\n", taskID++, paintingTPrior->ID, paintingTPrior->type, paintingTPrior->startTime, curSec, curSec- paintingTPrior->startTime); 
-            pthread_mutex_unlock(&lockTaskID);
-            
-            // The time the task is enqueued to new Queue
-            paintingTPrior->startTime = curSec;
-
-            pthread_mutex_lock(&priorLockID);
-            priorLastFinishedPaintingID = paintingTPrior->ID;
-            pthread_mutex_unlock(&priorLockID);
-
-            // What if another thread pulled the same task, and modified it?
-            // Thesoultion may be to save the id of last task they modified, elfBLastPaintingID
-            // if it exceded elfA, then it modified it, you can make the relevant Done flag 1 and insert it 
-            // if it not then do not insert it into deliveryQ, let the other one do the above
-            // make this in a way that there will be no equal case
-            
-            pthread_mutex_lock(&priorLockID);
-            if (paintingTPrior->paintingDone == 1 &&  paintingTPrior->QADone == 1 &&   paintingTPrior->assemblyDone == 1 ) { // If all of them is done then enqueue
-                pthread_mutex_lock(&priorQLock);
-                Enqueue(packageQPrior, paintingTPrior); 
-                pthread_mutex_unlock(&priorQLock);
-            }
-            else if (paintingTPrior->assemblyDone != 1 || paintingTPrior->QADone != 1) { // If not check if the others did, if not leave job to them
-                
-                if (priorLastFinishedAssemblyID >= priorLastFinishedPaintingID &&  priorLastFinishedQAID >= priorLastFinishedPaintingID) {
-                    paintingTPrior->assemblyDone = 1; paintingTPrior->QADone = 1;
-                    pthread_mutex_lock(&priorQLock);
-                    Enqueue(packageQPrior, paintingTPrior); 
-                    pthread_mutex_unlock(&priorQLock);
-                }
-                
-            }
-            pthread_mutex_unlock(&priorLockID);
-            // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
-            // The issue with QA/painting must be resolved (Task type 4-5)
-            
-        }
 	
     }
 
@@ -379,102 +374,8 @@ void* ElfB(void *arg){
    
 
     while(1) {
-        
-        // Cehck package Queue, priority on it, it is made first
-        Task *packageT;
-        pthread_mutex_lock(&lock);
-        if (isEmpty(packageQ)) {
-            pthread_mutex_unlock(&lock);
-        }
-        else {
-            packageT = Dequeue(packageQ);
-            pthread_mutex_unlock(&lock);
-            
-            pthread_sleep(1);
-            packageT->packageDone = 1;
-
-            pthread_mutex_lock(&lockSecond);
-            int curSec = second;
-            pthread_mutex_unlock(&lockSecond);
-
-            pthread_mutex_lock(&lockTaskID);
-            printf("%-8d%-8d%-10dC         %-13d%-13d%-4dB\n", taskID++, packageT->ID, packageT->type, packageT->startTime, curSec, curSec-packageT->startTime ); 
-            pthread_mutex_unlock(&lockTaskID);
-            
-            packageT->startTime = curSec;
-              
-            pthread_mutex_lock(&lock);
-            Enqueue(deliveryQ, packageT); 
-            pthread_mutex_unlock(&lock);
-        }
-        // Package Done
-        
-        pthread_mutex_lock(&lock);
-        if (!isEmpty(packageQ)) {
-            pthread_mutex_unlock(&lock);
-            continue;
-        }
-        pthread_mutex_unlock(&lock);
-
-
-        // Painting Task
-        Task *assemblyT;
-        pthread_mutex_lock(&lock);
-        if (isEmpty(assemblyQ)) {
-            pthread_mutex_unlock(&lock);
-        }
-        else {
-            assemblyT = Dequeue(assemblyQ);
-            pthread_mutex_unlock(&lock);
-            
-            pthread_sleep(2);
-            assemblyT->assemblyDone = 1;
-
-            pthread_mutex_lock(&lockSecond);
-            int curSec = second;
-            pthread_mutex_unlock(&lockSecond);
-            
-            pthread_mutex_lock(&lockTaskID);
-            printf("%-8d%-8d%-10dA         %-13d%-13d%-4dB\n", taskID++, assemblyT->ID, assemblyT->type, assemblyT->startTime, curSec, curSec-assemblyT->startTime); 
-            pthread_mutex_unlock(&lockTaskID);
-         
-            assemblyT->startTime = curSec;
-
-            pthread_mutex_lock(&lockID); // It was commented
-            lastFinishedAssemblyID = assemblyT->ID;
-            pthread_mutex_unlock(&lockID);
-
-
-            // What if another thread pulled the same task, and modified it?
-            // Thesoultion may be to save the id of last task they modified, elfBLastPaintingID
-            // if it exceded elfA, then it modified it, you can make the relevant Done flag 1 and insert it 
-            // if it not then do not insert it into deliveryQ, let the other one do the above
-            // make this in a way that there will be no equal case
-
-            if (assemblyT->paintingDone == 1 && assemblyT->QADone == 1 && assemblyT->assemblyDone == 1 ) {
-                pthread_mutex_lock(&lock);
-                Enqueue(packageQ, assemblyT); 
-                pthread_mutex_unlock(&lock);
-            }
-            else if (assemblyT->paintingDone != 1 || assemblyT->QADone != 1) {
-                pthread_mutex_lock(&lockID);
-                if (lastFinishedPaintingID >= lastFinishedAssemblyID &&  lastFinishedQAID >= lastFinishedAssemblyID) {
-                    assemblyT->paintingDone = 1; assemblyT->QADone = 1;
-                    pthread_mutex_lock(&lock);
-                    Enqueue(packageQ, assemblyT); 
-                    pthread_mutex_unlock(&lock);
-                }
-                pthread_mutex_unlock(&lockID);
-            }
-
-            // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
-            // The issue with QA/asembly must be resolved (Task type 4-5)
-
-        }
-        
-
-
-        /*
+    
+    	 /*
                         NEW ZELAND TASKS MAKE A HARD CHECK HERE
          
         */
@@ -532,7 +433,9 @@ void* ElfB(void *arg){
             pthread_mutex_unlock(&priorQLock);
             
             pthread_sleep(2); // Painting time
+            pthread_mutex_lock(&priorLockID);
             assemblyTPrior->assemblyDone = 1;
+            pthread_mutex_unlock(&priorLockID);
             
             // Get the current time
             pthread_mutex_lock(&lockSecond);
@@ -547,10 +450,6 @@ void* ElfB(void *arg){
             // The time the task is enqueued to new Queue
             assemblyTPrior->startTime = curSec;
 
-            pthread_mutex_lock(&priorLockID);
-            priorLastFinishedAssemblyID = assemblyTPrior->ID;
-            pthread_mutex_unlock(&priorLockID);
-
             // What if another thread pulled the same task, and modified it?
             // Thesoultion may be to save the id of last task they modified, elfBLastPaintingID
             // if it exceded elfA, then it modified it, you can make the relevant Done flag 1 and insert it 
@@ -563,14 +462,6 @@ void* ElfB(void *arg){
                 pthread_mutex_unlock(&priorQLock);
             }
             else if (assemblyTPrior->paintingDone != 1 || assemblyTPrior->QADone != 1) { // If not check if the others did, if not leave job to them
-                
-                if (priorLastFinishedPaintingID >= priorLastFinishedAssemblyID &&  priorLastFinishedQAID >= priorLastFinishedAssemblyID) {
-                    assemblyTPrior->paintingDone = 1; assemblyTPrior->QADone = 1;
-                    pthread_mutex_lock(&priorQLock);
-                    Enqueue(packageQPrior, assemblyTPrior); 
-                    pthread_mutex_unlock(&priorQLock);
-                }
-                
             }
             pthread_mutex_unlock(&priorLockID);
 
@@ -578,9 +469,102 @@ void* ElfB(void *arg){
             // The issue with QA/painting must be resolved (Task type 4-5)
             
         }
+    	
+        pthread_mutex_lock(&priorQLock);
+        if (!isEmpty(packageQPrior) || !isEmpty(assemblyQPrior) ) {
+            pthread_mutex_unlock(&priorQLock);
+            continue;
+        }
+        pthread_mutex_unlock(&priorQLock); 
 
 
-	
+        
+        /*
+        				NORMAL TASK
+        */
+        
+        // Cehck package Queue, priority on it, it is made first
+        Task *packageT;
+        pthread_mutex_lock(&lock);
+        if (isEmpty(packageQ)) {
+            pthread_mutex_unlock(&lock);
+        }
+        else {
+            packageT = Dequeue(packageQ);
+            pthread_mutex_unlock(&lock);
+            
+            pthread_sleep(1);
+            packageT->packageDone = 1;
+
+            pthread_mutex_lock(&lockSecond);
+            int curSec = second;
+            pthread_mutex_unlock(&lockSecond);
+
+            pthread_mutex_lock(&lockTaskID);
+            printf("%-8d%-8d%-10dC         %-13d%-13d%-4dB\n", taskID++, packageT->ID, packageT->type, packageT->startTime, curSec, curSec-packageT->startTime ); 
+            pthread_mutex_unlock(&lockTaskID);
+            
+            packageT->startTime = curSec;
+              
+            pthread_mutex_lock(&lock);
+            Enqueue(deliveryQ, packageT); 
+            pthread_mutex_unlock(&lock);
+        }
+        // Package Done
+        
+        pthread_mutex_lock(&lock);
+        if (!isEmpty(packageQ)) {
+            pthread_mutex_unlock(&lock);
+            continue;
+        }
+        pthread_mutex_unlock(&lock);
+
+
+        // Painting Task
+        Task *assemblyT;
+        pthread_mutex_lock(&lock);
+        if (isEmpty(assemblyQ)) {
+            pthread_mutex_unlock(&lock);
+        }
+        else {
+            assemblyT = Dequeue(assemblyQ);
+            pthread_mutex_unlock(&lock);
+            
+            pthread_sleep(2);
+            pthread_mutex_lock(&lockID); // It was commented
+            assemblyT->assemblyDone = 1;
+            pthread_mutex_unlock(&lockID); // It was commented
+
+            pthread_mutex_lock(&lockSecond);
+            int curSec = second;
+            pthread_mutex_unlock(&lockSecond);
+            
+            pthread_mutex_lock(&lockTaskID);
+            printf("%-8d%-8d%-10dA         %-13d%-13d%-4dB\n", taskID++, assemblyT->ID, assemblyT->type, assemblyT->startTime, curSec, curSec-assemblyT->startTime); 
+            pthread_mutex_unlock(&lockTaskID);
+         
+            assemblyT->startTime = curSec;
+
+
+
+            // What if another thread pulled the same task, and modified it?
+            // Thesoultion may be to save the id of last task they modified, elfBLastPaintingID
+            // if it exceded elfA, then it modified it, you can make the relevant Done flag 1 and insert it 
+            // if it not then do not insert it into deliveryQ, let the other one do the above
+            // make this in a way that there will be no equal case
+            pthread_mutex_lock(&lockID);
+            if (assemblyT->paintingDone == 1 && assemblyT->QADone == 1 && assemblyT->assemblyDone == 1 ) {
+                pthread_mutex_lock(&lock);
+                Enqueue(packageQ, assemblyT); 
+                pthread_mutex_unlock(&lock);
+            }
+            else if (assemblyT->paintingDone != 1 || assemblyT->QADone != 1) {
+            }
+            pthread_mutex_unlock(&lockID);
+            // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
+            // The issue with QA/asembly must be resolved (Task type 4-5)
+
+        }
 
     }
 
@@ -590,102 +574,8 @@ void* ElfB(void *arg){
 void* Santa(void *arg){
     
     while(1) {
-        
-        // Check delivery Queue, priority on it, it is made first
-        Task *deliveryT;
-        pthread_mutex_lock(&lock);
-        if (isEmpty(deliveryQ)) {
-            pthread_mutex_unlock(&lock);
-        }
-        else {
-            deliveryT = Dequeue(deliveryQ);
-            pthread_mutex_unlock(&lock);
-            
-            pthread_sleep(1);
-            deliveryT->deliveryDone = 1;
-            
-            pthread_mutex_lock(&lockSecond);
-            int curSec = second;
-            pthread_mutex_unlock(&lockSecond);
-
-            pthread_mutex_lock(&lockTaskID);
-            printf("%-8d%-8d%-10dD         %-13d%-13d%-4dS\n", taskID++, deliveryT->ID, deliveryT->type, deliveryT->startTime, curSec, curSec-deliveryT->startTime); 
-            free(deliveryT);
-	    pthread_mutex_unlock(&lockTaskID);
-        }
-        // Delivery Done
-        
-
-        // To dequeue Delvivery till its empty
-        pthread_mutex_lock(&lock);
-        if (!isEmpty(deliveryQ) && QAQ->size < 3) {
-            pthread_mutex_unlock(&lock);
-            continue;
-        }
-        pthread_mutex_unlock(&lock);
-
-
-        //Handle QA Queue
-        Task *QAT;
-        pthread_mutex_lock(&lock);
-        if (isEmpty(QAQ)) {
-            pthread_mutex_unlock(&lock);
-        }
-        else {
-            pthread_mutex_unlock(&lock);
-            
-            while(QAQ->size >= 3) {
-
-                pthread_mutex_lock(&lock);
-                QAT = Dequeue(QAQ);
-                pthread_mutex_unlock(&lock);
-                
-                pthread_sleep(1);
-                QAT->QADone = 1;
-          
-
-                pthread_mutex_lock(&lockSecond);
-                int curSec = second;
-                pthread_mutex_unlock(&lockSecond);
-
-                pthread_mutex_lock(&lockTaskID);
-                printf("%-8d%-8d%-10dQ         %-13d%-13d%-4dS\n", taskID++, QAT->ID, QAT->type, QAT->startTime, curSec, curSec-QAT->startTime); 
-                pthread_mutex_unlock(&lockTaskID);
-          
-                QAT->startTime = curSec;
-
-                pthread_mutex_lock(&lockID);
-                lastFinishedQAID = QAT->ID;
-                pthread_mutex_unlock(&lockID);
-
-
-                // What if another thread pulled the same task, and modified it?
-                // Thesoultion may be to save the id of last task they modified, elfBLastPaintingID
-                // if it exceded elfA, then it modified it, you can make the relevant Done flag 1 and insert it 
-                // if it not then do not insert it into deliveryQ, let the other one do the above
-                // make this in a way that there will be no equal case
-
-                if (QAT->paintingDone == 1 && QAT->QADone == 1 && QAT->assemblyDone == 1 ) {
-                    pthread_mutex_lock(&lock);
-                    Enqueue(packageQ, QAT); 
-                    pthread_mutex_unlock(&lock);
-                }
-                else if (QAT->paintingDone != 1 || QAT->assemblyDone != 1) {
-                    pthread_mutex_lock(&lockID);
-                    if (lastFinishedAssemblyID >= lastFinishedQAID &&  lastFinishedPaintingID >= lastFinishedQAID) {
-                        QAT->assemblyDone = 1; QAT->paintingDone = 1;
-                        pthread_mutex_lock(&lock);
-                        Enqueue(packageQ, QAT); 
-                        pthread_mutex_unlock(&lock);
-                    }
-                    pthread_mutex_unlock(&lockID);
-
-                }
-                // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
-                // The issue with QA/asembly must be resolved (Task type 4-5)
-            }
-        }
- 
+    
+    	
         /*
                         NEW ZELAND TASKS MAKE A HARD CHECK HERE
          
@@ -738,7 +628,9 @@ void* Santa(void *arg){
             pthread_mutex_unlock(&priorQLock);
             
             pthread_sleep(1); // Painting time
+            pthread_mutex_lock(&priorLockID);
             QATPrior->QADone = 1;
+            pthread_mutex_unlock(&priorLockID);
             
             // Get the current time
             pthread_mutex_lock(&lockSecond);
@@ -753,10 +645,6 @@ void* Santa(void *arg){
             // The time the task is enqueued to new Queue
             QATPrior->startTime = curSec;
 
-            pthread_mutex_lock(&priorLockID);
-            priorLastFinishedQAID = QATPrior->ID;
-            pthread_mutex_unlock(&priorLockID);
-
             // What if another thread pulled the same task, and modified it?
             // Thesoultion may be to save the id of last task they modified, elfBLastPaintingID
             // if it exceded elfA, then it modified it, you can make the relevant Done flag 1 and insert it 
@@ -769,23 +657,115 @@ void* Santa(void *arg){
                 pthread_mutex_unlock(&priorQLock);
             }
             else if (QATPrior->paintingDone != 1 || QATPrior->QADone != 1) { // If not check if the others did, if not leave job to them
-                
-                if (priorLastFinishedAssemblyID >= priorLastFinishedQAID &&  priorLastFinishedPaintingID >= priorLastFinishedQAID) {
-                    QATPrior->assemblyDone = 1; QATPrior->paintingDone = 1;
-                    pthread_mutex_lock(&priorQLock);
-                    Enqueue(packageQPrior, QATPrior); 
-                    pthread_mutex_unlock(&priorQLock);
-                }
-                
-
-
             }
             pthread_mutex_unlock(&priorLockID);
             // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
             // The issue with QA/painting must be resolved (Task type 4-5)
             
         }
+        
+        pthread_mutex_lock(&priorQLock);
+        if (!isEmpty(deliveryQPrior) || !isEmpty(QAQPrior) ) {
+            pthread_mutex_unlock(&priorQLock); 
+            continue;
+        }
+        pthread_mutex_unlock(&priorQLock);
 
+
+    
+        
+        /*
+        				NORMAL TASK
+        */
+        
+        
+        // Check delivery Queue, priority on it, it is made first
+        Task *deliveryT;
+        pthread_mutex_lock(&lock);
+        if (isEmpty(deliveryQ)) {
+            pthread_mutex_unlock(&lock);
+        }
+        else {
+            deliveryT = Dequeue(deliveryQ);
+            pthread_mutex_unlock(&lock);
+            
+            pthread_sleep(1);
+            deliveryT->deliveryDone = 1;
+            
+            pthread_mutex_lock(&lockSecond);
+            int curSec = second;
+            pthread_mutex_unlock(&lockSecond);
+
+            pthread_mutex_lock(&lockTaskID);
+            printf("%-8d%-8d%-10dD         %-13d%-13d%-4dS\n", taskID++, deliveryT->ID, deliveryT->type, deliveryT->startTime, curSec, curSec-deliveryT->startTime); 
+            free(deliveryT);
+	    pthread_mutex_unlock(&lockTaskID);
+        }
+        // Delivery Done
+        
+
+        // To dequeue Delvivery till its empty
+        pthread_mutex_lock(&lock);
+        if (!isEmpty(deliveryQ) && QAQ->size < 3) {
+            pthread_mutex_unlock(&lock);
+            continue;
+        }
+        pthread_mutex_unlock(&lock);
+
+
+        //Handle QA Queue
+        Task *QAT;
+        pthread_mutex_lock(&lock);
+        if (isEmpty(QAQ)) {
+            pthread_mutex_unlock(&lock);
+        }
+        else {
+            pthread_mutex_unlock(&lock);
+            
+            while(QAQ->size >= 3) {
+
+                pthread_mutex_lock(&lock);
+                QAT = Dequeue(QAQ);
+                pthread_mutex_unlock(&lock);
+                
+                pthread_sleep(1);
+                pthread_mutex_lock(&lockID);
+                QAT->QADone = 1;
+                pthread_mutex_unlock(&lockID);
+          
+
+                pthread_mutex_lock(&lockSecond);
+                int curSec = second;
+                pthread_mutex_unlock(&lockSecond);
+
+                pthread_mutex_lock(&lockTaskID);
+                printf("%-8d%-8d%-10dQ         %-13d%-13d%-4dS\n", taskID++, QAT->ID, QAT->type, QAT->startTime, curSec, curSec-QAT->startTime); 
+                pthread_mutex_unlock(&lockTaskID);
+          
+                QAT->startTime = curSec;
+
+
+
+                // What if another thread pulled the same task, and modified it?
+                // Thesoultion may be to save the id of last task they modified, elfBLastPaintingID
+                // if it exceded elfA, then it modified it, you can make the relevant Done flag 1 and insert it 
+                // if it not then do not insert it into deliveryQ, let the other one do the above
+                // make this in a way that there will be no equal case
+                pthread_mutex_lock(&lockID);
+                if (QAT->paintingDone == 1 && QAT->QADone == 1 && QAT->assemblyDone == 1 ) {
+                    pthread_mutex_lock(&lock);
+                    Enqueue(packageQ, QAT); 
+                    pthread_mutex_unlock(&lock);
+                }
+                else if (QAT->paintingDone != 1 || QAT->assemblyDone != 1) {
+                
+                }
+                pthread_mutex_unlock(&lockID);
+                // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
+                // The issue with QA/asembly must be resolved (Task type 4-5)
+            }
+        }
+ 
 
        
             
@@ -810,7 +790,8 @@ void* ControlThread(void *arg){
 
         Task *task = malloc(sizeof(*task));
         task->ID = id;
-        task->startTime = id;        
+        task->startTime = second;        
+        id++;
 
         // Question is do we need seprate locks for each task Queue?
 
@@ -924,7 +905,6 @@ void* ControlThread(void *arg){
         }
         
 
-        id++;
         //printf("CREATED:\n");
         //printTask(task);
         //printf("Task added id=%d type=%d\n", task.ID, task.type);
