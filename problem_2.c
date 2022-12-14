@@ -257,8 +257,6 @@ void* ElfA(void *arg){
             else if (paintingTPrior->assemblyDone != 1 || paintingTPrior->QADone != 1) { // If not check if the others did, if not leave job to them
             }
             pthread_mutex_unlock(&priorLockID);
-            // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
-            // The issue with QA/painting must be resolved (Task type 4-5)
             
         }
         
@@ -358,8 +356,6 @@ void* ElfA(void *arg){
             else if (paintingT->assemblyDone != 1 || paintingT->QADone != 1) { // If not check if the others did, if not leave job to them
             }
             pthread_mutex_unlock(&lockID);
-            // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
-            // The issue with QA/painting must be resolved (Task type 4-5)
             
         }
 
@@ -422,7 +418,7 @@ void* ElfB(void *arg){
         pthread_mutex_unlock(&priorQLock);
 
 
-        // Painting Task
+        // Assembly Task
         Task *assemblyTPrior;
         pthread_mutex_lock(&priorQLock);
         if (isEmpty(assemblyQPrior)) { // If empty release lock
@@ -465,8 +461,6 @@ void* ElfB(void *arg){
             }
             pthread_mutex_unlock(&priorLockID);
 
-            // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
-            // The issue with QA/painting must be resolved (Task type 4-5)
             
         }
     	
@@ -561,8 +555,6 @@ void* ElfB(void *arg){
             else if (assemblyT->paintingDone != 1 || assemblyT->QADone != 1) {
             }
             pthread_mutex_unlock(&lockID);
-            // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
-            // The issue with QA/asembly must be resolved (Task type 4-5)
 
         }
 
@@ -592,7 +584,7 @@ void* Santa(void *arg){
             deliveryTPrior = Dequeue(deliveryQPrior); // Dequeue one element
             pthread_mutex_unlock(&priorQLock);
             
-            pthread_sleep(1); // Package time 
+            pthread_sleep(1); // Delivery time 
             deliveryTPrior->deliveryDone = 1;
             
             //Get the second we are in
@@ -604,7 +596,7 @@ void* Santa(void *arg){
             pthread_mutex_lock(&lockTaskID);
             printf("%-8d%-8d%-10dDN        %-13d%-13d%-4dS\n",taskID++ ,deliveryTPrior->ID, deliveryTPrior->type, deliveryTPrior->startTime, curSec, curSec-deliveryTPrior->startTime ); 
             free(deliveryTPrior);
-	    pthread_mutex_unlock(&lockTaskID);
+	        pthread_mutex_unlock(&lockTaskID);
         }
         // Delivery Done 
         
@@ -617,7 +609,7 @@ void* Santa(void *arg){
         pthread_mutex_unlock(&priorQLock);
 
 
-        // Painting Task
+        // QA Task
         Task *QATPrior;
         pthread_mutex_lock(&priorQLock);
         if (isEmpty(QAQPrior)) { // If empty release lock
@@ -627,7 +619,7 @@ void* Santa(void *arg){
             QATPrior = Dequeue(QAQPrior); // Dequeue one element
             pthread_mutex_unlock(&priorQLock);
             
-            pthread_sleep(1); // Painting time
+            pthread_sleep(1); //QA time
             pthread_mutex_lock(&priorLockID);
             QATPrior->QADone = 1;
             pthread_mutex_unlock(&priorLockID);
@@ -659,8 +651,6 @@ void* Santa(void *arg){
             else if (QATPrior->paintingDone != 1 || QATPrior->QADone != 1) { // If not check if the others did, if not leave job to them
             }
             pthread_mutex_unlock(&priorLockID);
-            // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
-            // The issue with QA/painting must be resolved (Task type 4-5)
             
         }
         
@@ -761,8 +751,6 @@ void* Santa(void *arg){
                 
                 }
                 pthread_mutex_unlock(&lockID);
-                // What if the QA is not done, since it either requires painting or assembly it is not a big deal for assembly/painting pair
-                // The issue with QA/asembly must be resolved (Task type 4-5)
             }
         }
  
