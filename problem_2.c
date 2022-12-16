@@ -97,7 +97,6 @@ int main(int argc,char **argv){
         if(!strcmp(argv[i], "-t")) {simulationTime = atoi(argv[++i]);}
         else if(!strcmp(argv[i], "-s"))  {seed = atoi(argv[++i]);}
     }
-    
     srand(seed); // feed the seed
     
     /* Queue usage example
@@ -892,20 +891,12 @@ void* ControlThread(void *arg){
 
         }
         
-
-        //printf("CREATED:\n");
-        //printTask(task);
-        //printf("Task added id=%d type=%d\n", task.ID, task.type);
+                   
         
     }
 
 
 }
-
-
-
-
-
 
 
 void printTask(Task *t) {
